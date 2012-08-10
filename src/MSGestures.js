@@ -9,12 +9,13 @@
 (function () {
     "use strict";
     var eventsArray = [],
+        domElements = [],
         supportedGestures = ["swipe", "pinch"],
         thresholds = {
-            translation:15,
-            velocity:10,
-            scaleUp:1.2,
-            scaleDown:0.8
+            translation:10,
+            velocity:0.5,
+            scaleUp:1.3,
+            scaleDown:0.7
         },
         MSGestures;
 
@@ -24,29 +25,51 @@
     }
 
     function fireCallbacks(type, e) {
-        var events = eventsArray[type];
-        for (var i = 0; i < events.length; i++) {
-            if (events[i].domElement === e.target) {
-                events[i].callback(e);
+        var callbackName = type + 'Callback',
+            container;
+        for (var i = 0; i < eventsArray.length; i++) {
+            container = eventsArray[i];
+            if (container.domElement === e.target) {
+                if (Array.isArray(container[callbackName])) {
+                    for (var j = 0; j < container[callbackName].length; j++) {
+                        container[callbackName][j](e);
+                    }
+                }
             }
         }
     }
 
     function handleGesture(e) {
-        //SWIPE detection
-        if (Math.abs(e.translationX) >= thresholds.translation && e.velocityX > thresholds.velocity) {
-            fireCallbacks("swipe", e);
+        //console.log('scale: ' + e.scale + ' translation: ' + e.translationX + ' velocity: ' + e.velocityX);
+        this.velocity += e.velocityX;
+        this.translation += e.translationX;
+        this.scale *= e.scale;
+
+        //console.log(e.scale + ' ' + this.scale + ' ' + thresholds.scaleDown);
+        //PINCH detection
+        if (this.capturing && (this.scale >= thresholds.scaleUp || this.scale <= thresholds.scaleDown)) {
+            fireCallbacks("pinch", e);
+            this.capturing = false;
+            return;
         }
 
-        //PINCH detection
-        if (e.scale >= thresholds.scaleUp || e.scale <= thresholds.scaleDown) {
-            fireCallbacks("pinch", e);
+        //SWIPE detection
+        if (this.capturing && this.scale === 1 && (Math.abs(this.translation) >= thresholds.translation)) {
+            this.capturing = false;
+            fireCallbacks("swipe", e);
         }
+    }
+
+    function gestureStop(e) {
+        this.translation = 0;
+        this.velocity = 0;
+        this.scale = 1;
+        this.capturing = true;
     }
 
 
     function checkParameters(domElement, type, callback) {
-        if (typeof domElement !== "undefined" && typeof domElement.nodeName !== "undefined") {
+        if (typeof domElement === "undefined" || typeof domElement.nodeName === "undefined") {
             throw {
                 message:"domElement is not a valid DOM element"
             };
@@ -66,48 +89,63 @@
     }
 
     function addEventListener(domElement, type, callback) {
-        var events, gesture;
+        var events, gesture, gestureContainer, callbackName = type + 'Callback', existing = false;
         //parameter validation
         checkParameters(domElement, type, callback);
 
-        events = eventsArray[type];
-
-        for (var i = 0; i < events; i++) {
-            if (events[i].domElement === domElement && events[i].callback === callback) {
-                //handler already added. Should we added again?
-                //If we are removing it should we throw an exception if it is not founded?
+        for (var i = 0; i < eventsArray.length; i++) {
+            if (eventsArray[i].domElement === domElement) {
+                if (!Array.isArray(eventsArray[i][callbackName])) {
+                    eventsArray[i][callbackName] = [];
+                }
+                eventsArray[i][callbackName].push(callback);
+                //we add the new gesture callback and we quit. The general gesture handler will take care of the rest
+                return;
             }
         }
 
         gesture = new MSGesture();
         gesture.target = domElement;
 
-        //we add the callback to our list
-        events.push({
+        gestureContainer = {
             gesture:gesture,
             domElement:domElement,
-            callback:callback,
-            addPointer: function(evt){
-                this.gesture.addPointer(evt.pointerId)
+            translation:0,
+            velocity:0,
+            scale:1,
+            capturing:true,
+            addPointer:function (evt) {
+                gesture.addPointer(evt.pointerId)
             }
-        });
+        };
+        gestureContainer[type + 'Callback'] = [];
+        gestureContainer[type + 'Callback'].push(callback);
 
-        domElement.addEventListener("MSGestureChange", handleGesture);
-        domElement.addEventListener("MSPointerDown", gesture.addPointer);
+        //we add the callback to our list
+        eventsArray.push(gestureContainer);
+
+        domElement.addEventListener("MSGestureChange", handleGesture.bind(gestureContainer));
+        domElement.addEventListener("MSGestureEnd", gestureStop.bind(gestureContainer));
+        domElement.addEventListener("MSPointerDown", gestureContainer.addPointer);
+
+        //adding CSS class to prevent default touch actions
+        domElement.style.msTouchAction = "none";
     }
 
     function removeEventListener(domElement, type, callback) {
         var gesture;
         checkParameters(domElement, type, callback);
 
-        for(var i = 0; i < eventsArray[type].length;i++){
+        for (var i = 0; i < eventsArray[type].length; i++) {
             gesture = eventsArray[type][i];
-            if(gesture.domElement === domElement && gesture.callback === callback){
+            if (gesture.domElement === domElement && gesture.callback === callback) {
                 //removing DOM events
-                gesture.domElement.removeEventListener("MSGestureChange",handleGesture);
-                gesture.domElement.removeEventListener("MSGestureChange",gesture.addPointer);
+                gesture.domElement.removeEventListener("MSGestureChange", handleGesture);
+                gesture.domElement.removeEventListener("MSGestureChange", gesture.addPointer);
+                //adding CSS class to prevent default touch actions
+                gesture.domElement.style.msTouchAction = "";
                 //removing the reference to that element
-                eventsArray[type].splice(i,1);
+                eventsArray[type].splice(i, 1);
             }
         }
     }
