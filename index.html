@@ -4,60 +4,90 @@
     <title>MSGestures</title>
     <script src="src/MSGestures.js"></script>
     <style>
-        #test1{
-            width:400px;
-            height:400px;
+        #test1 {
+            width: 400px;
+            height: 400px;
             border: solid 1px;
         }
 
-        .left{
+        .left {
             background-color: green;
         }
 
-        .right{
+        .right {
             background-color: red;
         }
 
-        .zoomIn{
+        .zoomIn {
             background-color: blue;
         }
 
-        .zoomOut{
+        .zoomOut {
             background-color: yellow;
         }
     </style>
+    <button onclick="addHandlers()">Add Handlers</button>
+    <button onclick="removeHandlers()">Remove Handlers</button>
 </head>
 <body>
 <div>Library to abstract Microsoft Gestures for the web</div>
 <div id="test1">
     <p>Green: Swipe to the left</p>
+
     <p>Red: Swipe to the right</p>
+
     <p>Blue: Pinch in</p>
+
     <p>Yellow: Pinch out</p>
 </div>
 <script>
     var domEle = document.getElementById('test1');
 
-    function swipe(e){
-        if(e.translationX <0){
+    function swipe(e) {
+        if (e.translationX < 0) {
             //swipe to the left
             domEle.className = "left";
-        }else{
+        } else {
             domEle.className = "right";
         }
+    }
+
+    function logSwipe() {
         console.log('swipe');
     }
 
-    function pinch(e){
-        if(e.scale > 1){
-            domEle.className = "zoomIn";
-        }else{
-            domEle.className = "zoomOut";
-        }
+    function logPinch() {
         console.log('pinch');
     }
-    MSGestures.addEventListener(domEle,'swipe',swipe);
-    MSGestures.addEventListener(domEle,'pinch',pinch);
+
+    function pinch(e) {
+        if (e.scale > 1) {
+            domEle.className = "zoomIn";
+        } else {
+            domEle.className = "zoomOut";
+        }
+    }
+
+    var gestures = new MSGestures({
+        translation:30
+    });
+
+    function addHandlers() {
+        gestures.addEventListener(domEle, 'swipe', swipe);
+        gestures.addEventListener(domEle, 'swipe', logSwipe);
+        gestures.addEventListener(domEle, 'pinch', pinch);
+        gestures.addEventListener(domEle, 'pinch', logPinch);
+    }
+
+    function removeHandlers() {
+        console.log('remove handlers');
+        gestures.removeEventListener(domEle, 'swipe', swipe);
+        gestures.removeEventListener(domEle, 'swipe', logSwipe);
+        gestures.removeEventListener(domEle, 'swipe', pinch);
+        gestures.removeEventListener(domEle, 'swipe', logPinch);
+
+    }
+
 </script>
 </body>
 </html>

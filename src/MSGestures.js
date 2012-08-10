@@ -6,16 +6,15 @@
  * Licensed under the MIT, GPL licenses.
  */
 
-(function () {
+var MSGestures = function (settings) {
     "use strict";
     var eventsArray = [],
-        domElements = [],
         supportedGestures = ["swipe", "pinch"],
         thresholds = {
-            translation:10,
-            velocity:0.5,
-            scaleUp:1.3,
-            scaleDown:0.7
+            translation:settings.translation || 10,
+            velocity:settings.velocity || 0.5,
+            scaleUp:settings.scaleUp || 1.3,
+            scaleDown:settings.scaleDown || 0.7
         },
         MSGestures;
 
@@ -60,7 +59,7 @@
         }
     }
 
-    function gestureStop(e) {
+    function gestureStop() {
         this.translation = 0;
         this.velocity = 0;
         this.scale = 1;
@@ -89,7 +88,7 @@
     }
 
     function addEventListener(domElement, type, callback) {
-        var events, gesture, gestureContainer, callbackName = type + 'Callback', existing = false;
+        var gesture, gestureContainer, callbackName = type + 'Callback';
         //parameter validation
         checkParameters(domElement, type, callback);
 
@@ -133,27 +132,38 @@
     }
 
     function removeEventListener(domElement, type, callback) {
-        var gesture;
+        var gesture, callbackName = type + 'Callback', clearAll = true;
         checkParameters(domElement, type, callback);
 
-        for (var i = 0; i < eventsArray[type].length; i++) {
-            gesture = eventsArray[type][i];
-            if (gesture.domElement === domElement && gesture.callback === callback) {
-                //removing DOM events
-                gesture.domElement.removeEventListener("MSGestureChange", handleGesture);
-                gesture.domElement.removeEventListener("MSGestureChange", gesture.addPointer);
-                //adding CSS class to prevent default touch actions
-                gesture.domElement.style.msTouchAction = "";
-                //removing the reference to that element
-                eventsArray[type].splice(i, 1);
+        for (var i = 0; i < eventsArray.length; i++) {
+            gesture = eventsArray[i];
+            if (gesture.domElement === domElement && Array.isArray(gesture[callbackName])){
+                for(var j = 0; j < gesture[callbackName].length; j++){
+                    if(gesture[callbackName][j] === callback){
+                        gesture[callbackName].splice(j,1);
+                    }
+                }
+
+                for(var k = 0; k < supportedGestures.length; k++){
+                    callbackName = supportedGestures[k] + 'Callback';
+                    if(Array.isArray(gesture[callbackName]) && gesture[callbackName].length > 0){
+                        clearAll = false;
+                    }
+                }
+
+                if(clearAll){
+                    //removing DOM events
+                    gesture.domElement.removeEventListener("MSGestureChange", handleGesture);
+                    gesture.domElement.removeEventListener("MSGestureChange", gesture.addPointer);
+                    //adding CSS class to prevent default touch actions
+                    gesture.domElement.style.msTouchAction = "";
+                    //removing the reference to that element
+                    eventsArray.splice(i, 1);
+                }
             }
         }
     }
 
-    MSGestures = {
-        addEventListener:addEventListener,
-        removeEventListener:removeEventListener
-    };
-
-    window.MSGestures = MSGestures;
-}());
+    this.addEventListener = addEventListener;
+    this.removeEventListener = removeEventListener
+}
